@@ -34,6 +34,35 @@ if [ -x /usr/bin/php-cgi ]; then
   fi
 fi
 
+# --- TinyFM: no password, straight in + rootfs symlink ---
+# Disable TinyFM's own login (LuCI already requires auth)
+if uci -q get tinyfm.auth.enable >/dev/null 2>&1; then
+  uci set tinyfm.auth.enable='0'
+  uci commit tinyfm
+fi
+# Make sure the rootfs symlink exists (fixes 'Root path not found')
+if [ -x /usr/bin/tinyfm.sh ] && [ ! -e /www/tinyfm/rootfs ]; then
+  /usr/bin/tinyfm.sh rootfs >/dev/null 2>&1
+fi
+
+# --- ttyd: skip login prompt, straight to root shell ---
+for _s in $(uci show ttyd 2>/dev/null | sed -n 's/^ttyd\.\([^.=]*\)=ttyd/\1/p'); do
+  uci set ttyd.$_s.command='/bin/login -f root'
+done
+uci commit ttyd 2>/dev/null
+
+# --- 03NET dashboard: activate circle-gauge overview ---
+# (backs up stock status includes; idempotent — safe to run twice)
+for _f in /www/luci-static/resources/view/status/include/10_system.js \
+          /www/luci-static/resources/view/status/include/20_memory.js \
+          /www/luci-static/resources/view/status/include/25_storage.js \
+          /www/luci-static/resources/view/status/include/29_ports.js \
+          /www/luci-static/resources/view/status/include/30_network.js \
+          /www/luci-static/resources/view/status/include/40_dhcp.js \
+          /www/luci-static/resources/view/status/include/60_wifi.js; do
+  [ -f "$_f" ] && mv "$_f" "$_f.bak"
+done
+
 # --- 03NET login banner (ttyd / SSH) ---
 chmod +x /etc/03net-motd.sh 2>/dev/null
 if ! grep -q "03net-motd" /etc/profile 2>/dev/null; then
