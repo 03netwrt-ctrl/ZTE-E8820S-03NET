@@ -85,9 +85,14 @@ jobs:
         sed -i '72r patch/upgrade.txt' openwrt/target/linux/ramips/mt7621/base-files/lib/upgrade/platform.sh
         cat patch/zte.txt >> openwrt/target/linux/ramips/image/mt7621.mk
         cp patch/99-default-settings openwrt/package/base-files/files/etc/uci-defaults/
-        # Custom kernel name, e.g. 6.6.x-03net (like 5.15.189-mutiarawrt)
-        grep -q 'CONFIG_LOCALVERSION="-03net"' openwrt/target/linux/ramips/mt7621/config-6.6 \
-          || echo 'CONFIG_LOCALVERSION="-03net"' >> openwrt/target/linux/ramips/mt7621/config-6.6
+        # Custom kernel name, e.g. 6.6.144-03net (like 5.15.189-mutiarawrt)
+        # NOTE: OpenWrt's kconfig.pl merge is FIRST-WINS for string symbols,
+        # so appending to the subtarget config loses against generic's
+        # CONFIG_LOCALVERSION="". We must REPLACE it in the generic config.
+        sed -i 's/^CONFIG_LOCALVERSION=""/CONFIG_LOCALVERSION="-03net"/' \
+          openwrt/target/linux/generic/config-6.6
+        grep -q 'CONFIG_LOCALVERSION="-03net"' openwrt/target/linux/generic/config-6.6 \
+          && echo "kernel localversion set" || (echo "localversion patch FAILED"; exit 1)
         mkdir -p openwrt/files
         cp -r overlay/* openwrt/files/
 
