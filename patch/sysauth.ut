@@ -1,0 +1,122 @@
+{#
+ 03NET-WRT custom login page for ZTE E8820S
+ Full-screen wallpaper + glassmorphism card, Indonesian date/clock.
+ Replaces feeds/luci/modules/luci-base/ucode/template/sysauth.ut at build time.
+-#}
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" name="viewport"/>
+<meta name="theme-color" content="#0aa5c2">
+<title>03NET-WRT - Login</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  background:url('/luci-static/material/login-bg.jpg') no-repeat center center fixed;
+  background-size:cover;
+  min-height:100vh;display:flex;align-items:center;justify-content:center;
+  padding:20px;
+}
+body::before{
+  content:'';position:fixed;inset:0;
+  background:rgba(8,8,18,.48);
+  pointer-events:none;
+}
+.card{
+  position:relative;width:360px;max-width:100%;
+  background:rgba(32,32,48,.58);
+  -webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);
+  border:1px solid rgba(255,255,255,.14);
+  border-radius:18px;
+  box-shadow:0 16px 48px rgba(0,0,0,.55);
+  padding:34px 34px 26px;color:#fff;text-align:center;
+}
+.brand{
+  font-size:13px;letter-spacing:4px;color:#4fd7ec;
+  font-weight:700;margin-bottom:6px;
+}
+.card h1{font-size:28px;font-weight:700;margin-bottom:4px}
+.datetime{font-size:13px;color:rgba(255,255,255,.72);margin-bottom:22px}
+.alert{
+  background:rgba(255,82,82,.16);border:1px solid rgba(255,82,82,.5);
+  color:#ffb4b4;border-radius:10px;padding:10px 12px;
+  font-size:13px;margin-bottom:16px;
+}
+.field{margin-bottom:14px;text-align:left}
+.field label{display:block;font-size:13px;color:rgba(255,255,255,.85);margin-bottom:6px}
+.input-wrap{position:relative}
+.field input{
+  width:100%;padding:12px 40px 12px 14px;
+  border:none;border-radius:10px;font-size:15px;
+  background:#fff;color:#111;outline:none;
+}
+.field input:focus{box-shadow:0 0 0 3px rgba(79,215,236,.55)}
+.toggle{
+  position:absolute;right:8px;top:50%;transform:translateY(-50%);
+  background:none;border:none;cursor:pointer;font-size:17px;
+  color:#666;padding:4px;
+}
+.btn-login{
+  width:100%;margin-top:6px;padding:13px;
+  border:none;border-radius:10px;cursor:pointer;
+  background:linear-gradient(90deg,#0a9db8,#2ad4ec);
+  color:#fff;font-size:16px;font-weight:700;
+  box-shadow:0 6px 18px rgba(10,157,184,.45);
+}
+.btn-login:hover{filter:brightness(1.08)}
+.btn-login:active{transform:translateY(1px)}
+.footer{margin-top:18px;font-size:12px;color:rgba(255,255,255,.55)}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="brand">03NET-WRT</div>
+  <h1>{{ _('Login') }}</h1>
+  <div class="datetime" id="dt">&nbsp;</div>
+
+  {% if (fuser): %}
+  <div class="alert">{{ _('Invalid username and/or password! Please try again.') }}</div>
+  {% endif %}
+
+  <form method="post" autocomplete="off">
+    <div class="field">
+      <label>{{ _('Username') }}</label>
+      <div class="input-wrap">
+        <input type="text" name="luci_username" value="{{ entityencode(duser, true) }}" style="padding-right:14px" />
+      </div>
+    </div>
+    <div class="field">
+      <label>{{ _('Password') }}</label>
+      <div class="input-wrap">
+        <input type="password" name="luci_password" id="pw" placeholder="{{ _('Your password') }}" />
+        <button type="button" class="toggle" id="eye" title="show/hide">&#128065;</button>
+      </div>
+    </div>
+    <button type="submit" class="btn-login">{{ _('Log in') }}</button>
+  </form>
+
+  <div class="footer">03NET-WRT &bull; &copy; 2026</div>
+</div>
+
+<script>
+(function(){
+  var pw=document.getElementById('pw');
+  if(pw) pw.focus();
+  var eye=document.getElementById('eye');
+  if(eye&&pw){eye.onclick=function(){pw.type=(pw.type==='password')?'text':'password';};}
+  function tick(){
+    try{
+      var d=new Date();
+      var date=d.toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+      var time=d.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit',second:'2-digit'}).replace(/\./g,':');
+      document.getElementById('dt').textContent=date+' \u2022 '+time;
+    }catch(e){}
+  }
+  tick();setInterval(tick,1000);
+})();
+</script>
+</body>
+</html>

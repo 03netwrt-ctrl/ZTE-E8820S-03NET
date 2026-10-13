@@ -15,6 +15,25 @@ if uci -q get luci.themes.Material >/dev/null 2>&1; then
   uci commit luci
 fi
 
+# --- Firmware version branding: "OpenWrt 24.10.8 | 03NET" ---
+if [ -f /etc/openwrt_release ]; then
+  . /etc/openwrt_release
+  if [ -n "$DISTRIB_RELEASE" ]; then
+    sed -i "s|^DISTRIB_DESCRIPTION=.*|DISTRIB_DESCRIPTION='OpenWrt $DISTRIB_RELEASE \| 03NET'|" /etc/openwrt_release
+  fi
+fi
+
+# --- TinyFM: let uhttpd execute PHP via php-cgi ---
+# Without this, opening TinyFM makes the browser download index.php
+# ("Save As" dialog) instead of showing the file manager.
+if [ -x /usr/bin/php-cgi ]; then
+  if ! uci -q get uhttpd.main.interpreter 2>/dev/null | grep -q "php-cgi"; then
+    uci add_list uhttpd.main.interpreter='.php=/usr/bin/php-cgi'
+    uci commit uhttpd
+    /etc/init.d/uhttpd restart >/dev/null 2>&1
+  fi
+fi
+
 # --- 03NET login banner (ttyd / SSH) ---
 chmod +x /etc/03net-motd.sh 2>/dev/null
 if ! grep -q "03net-motd" /etc/profile 2>/dev/null; then

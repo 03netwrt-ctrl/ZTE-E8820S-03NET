@@ -85,6 +85,9 @@ jobs:
         sed -i '72r patch/upgrade.txt' openwrt/target/linux/ramips/mt7621/base-files/lib/upgrade/platform.sh
         cat patch/zte.txt >> openwrt/target/linux/ramips/image/mt7621.mk
         cp patch/99-default-settings openwrt/package/base-files/files/etc/uci-defaults/
+        # Custom kernel name, e.g. 6.6.x-03net (like 5.15.189-mutiarawrt)
+        grep -q 'CONFIG_LOCALVERSION="-03net"' openwrt/target/linux/ramips/mt7621/config-6.6 \
+          || echo 'CONFIG_LOCALVERSION="-03net"' >> openwrt/target/linux/ramips/mt7621/config-6.6
         mkdir -p openwrt/files
         cp -r overlay/* openwrt/files/
 
@@ -97,26 +100,15 @@ jobs:
         ./scripts/feeds update -a
         ./scripts/feeds install -a
 
-    - name: Brand LuCI login page (One Piece wallpaper)
+    - name: Brand LuCI login page (03NET glassmorphism + One Piece wallpaper)
       working-directory: ./openwrt
       run: |
-        python3 - <<'PYEOF'
-        p = "feeds/luci/modules/luci-base/ucode/template/sysauth.ut"
-        s = open(p).read()
-        css = (
-            "<style>\n"
-            "body.node-main-login{background:url('/luci-static/material/login-bg.jpg') "
-            "no-repeat center center fixed !important;background-size:cover !important}\n"
-            "body.node-main-login .cbi-map{box-shadow:0 8px 32px rgba(0,0,0,.45)}\n"
-            "</style>\n"
-        )
-        marker = "{% include('header') %}"
-        assert marker in s, "sysauth.ut marker not found"
-        assert "login-bg.jpg" not in s, "already patched"
-        s = s.replace(marker, marker + "\n" + css, 1)
-        open(p, "w").write(s)
-        print("login background injected into sysauth.ut")
-        PYEOF
+        p="feeds/luci/modules/luci-base/ucode/template/sysauth.ut"
+        cp ../patch/sysauth.ut "$p"
+        grep -q 'name="luci_username"' "$p" && grep -q 'name="luci_password"' "$p" \
+          && grep -q 'login-bg.jpg' "$p" \
+          && echo "custom 03NET login page installed" \
+          || (echo "sysauth.ut validation FAILED"; exit 1)
 
     - name: Apply 03NET config and inject toolchain
       working-directory: ./openwrt
