@@ -15,6 +15,12 @@ if uci -q get luci.themes.Material >/dev/null 2>&1; then
   uci commit luci
 fi
 
+# --- 03NET login banner (ttyd / SSH) ---
+chmod +x /etc/03net-motd.sh 2>/dev/null
+if ! grep -q "03net-motd" /etc/profile 2>/dev/null; then
+  printf '\n[ -x /etc/03net-motd.sh ] && /etc/03net-motd.sh\n' >> /etc/profile
+fi
+
 # --- WiFi: 2.4GHz = 03NET-WRT, 5GHz = 03NET-WRT 5G ---
 # NOTE: WPA2 needs at least 8 characters!
 wlan_password="03netwrt"
