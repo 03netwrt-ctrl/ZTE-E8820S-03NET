@@ -283,7 +283,7 @@ return baseclass.extend({
         .getUTCMinutes(), d.getUTCSeconds())
     }
     let fields = [_("Model"), (boardinfo.model || "Unknown") + " " +
-      brand, _("Firmware"), (boardinfo.release?.description || ""), _(
+      brand, _("Firmware"), "OpenWrt " + (boardinfo.release?.version || "") + " | 03NET", _(
         "Kernel"), boardinfo.kernel, _("Local Time"), datestr, _(
         "Uptime"), "%t".format(systeminfo.uptime || 0)
     ];
@@ -315,19 +315,26 @@ return baseclass.extend({
     let mbps = (total * 8) / 1e6;
     let gNet = Math.min(100, (mbps / MAX_MBPS) * 100);
     if (!uiBuilt) {
-      let g1 = buildGauge("CPU Temp");
+      let boxes = [];
+      // Hide CPU Temp gauge when no thermal sensor (MT7621 has none)
+      if (t > 0) {
+        let g1 = buildGauge("CPU Temp");
+        tempCircle = g1.fg;
+        tempText = g1.text;
+        boxes.push(g1.box);
+        window._hasTemp = true;
+      }
       let g2 = buildGauge("CPU Load");
       let g3 = buildGauge("RAM Usage");
       let g4 = buildGauge("Bandwidth");
       let connBox = buildConnGauge();
-      tempCircle = g1.fg;
-      tempText = g1.text;
       cpuCircle = g2.fg;
       cpuText = g2.text;
       memCircle = g3.fg;
       memText = g3.text;
       netCircle = g4.fg;
       netText = g4.text;
+      boxes.push(g2.box, g3.box, g4.box, connBox);
       window._gaugeGrid = E('div', {
         style: `
         display:grid;
@@ -335,7 +342,7 @@ return baseclass.extend({
         gap:16px;
         margin-top:4px;
       `
-      }, [g1.box, g2.box, g3.box, g4.box, connBox]);
+      }, boxes);
       uiBuilt = !0
       if (!window._resizeBound) {
         window.addEventListener('resize', function() {
@@ -353,11 +360,13 @@ return baseclass.extend({
         window._resizeBound = true;
       }
     }
-    animate(tempCircle, tempText, tempVal, t, () => t, "°C");
+    if (window._hasTemp) {
+      animate(tempCircle, tempText, tempVal, t, () => t, "°C");
+      tempVal = t;
+    }
     animate(cpuCircle, cpuText, cpuVal, c, () => c, "%");
     animate(memCircle, memText, memVal, m, () => m, "%");
     animate(netCircle, netText, netVal, gNet, () => sp.v, sp.u);
-    tempVal = t;
     cpuVal = c;
     memVal = m;
     netVal = gNet;
