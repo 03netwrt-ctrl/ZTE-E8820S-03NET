@@ -41,8 +41,9 @@ if uci -q get tinyfm.auth.enable >/dev/null 2>&1; then
   uci commit tinyfm
 fi
 # Make sure the rootfs symlink exists (fixes 'Root path not found')
-if [ -x /usr/bin/tinyfm.sh ] && [ ! -e /www/tinyfm/rootfs ]; then
-  /usr/bin/tinyfm.sh rootfs >/dev/null 2>&1
+# Use ln -sf directly: more robust than tinyfm.sh across installs
+if [ -d /www/tinyfm ]; then
+  ln -sf / /www/tinyfm/rootfs
 fi
 
 # --- ttyd: skip login prompt, straight to root shell ---
