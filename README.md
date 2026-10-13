@@ -29,6 +29,9 @@ Wi-Fi password  : (see release notes)
   wwan), `kmod-usb-net-*` (qmi-wwan, mbim, rndis, cdc-ncm, huawei),
   `usb-modeswitch`, ModemManager + `luci-proto-modemmanager`, sms-tool
 - **USB storage**: `kmod-usb-storage`, `block-mount`
+- **WiFi maxed out**: full `wpad` (WPA3-SAE, OWE, 802.11r roaming, WPS),
+  USB WiFi dongle drivers (rt2800, rtl8xxxu, mt76x0u, mt76x2u, ath9k-htc),
+  `hostapd-utils`
 - Branding: 03NET banner, hostname `03NET-E8820S`
 
 ## Installation
