@@ -183,23 +183,56 @@ function buildGauge(label) {
 }
 
 function buildClock() {
-  let timeEl = E('div', {
-    style: `
-      font-size:26px;
-      font-weight:700;
-      font-variant-numeric:tabular-nums;
-      letter-spacing:1px;
-      margin:14px 0 6px;
-      font-family:monospace;
-    `
-  }, "--:--:--");
+  let NS = "http://www.w3.org/2000/svg";
+  let svg = document.createElementNS(NS, "svg");
+  svg.setAttribute("width", "90");
+  svg.setAttribute("height", "90");
+  // Face
+  let face = document.createElementNS(NS, "circle");
+  face.setAttribute("cx", "45"); face.setAttribute("cy", "45"); face.setAttribute("r", "40");
+  face.setAttribute("fill", "none");
+  face.setAttribute("stroke", "rgba(128,128,128,0.35)");
+  face.setAttribute("stroke-width", "2");
+  svg.appendChild(face);
+  // Hour markers
+  for (let i = 0; i < 12; i++) {
+    let a = i * 30 * Math.PI / 180;
+    let card = (i % 3 === 0);
+    let r1 = card ? 31 : 34, r2 = 37;
+    let ln = document.createElementNS(NS, "line");
+    ln.setAttribute("x1", (45 + r1 * Math.sin(a)).toFixed(1));
+    ln.setAttribute("y1", (45 - r1 * Math.cos(a)).toFixed(1));
+    ln.setAttribute("x2", (45 + r2 * Math.sin(a)).toFixed(1));
+    ln.setAttribute("y2", (45 - r2 * Math.cos(a)).toFixed(1));
+    ln.setAttribute("stroke", card ? "#4ade80" : "rgba(128,128,128,0.65)");
+    ln.setAttribute("stroke-width", card ? "2.5" : "1.5");
+    ln.setAttribute("stroke-linecap", "round");
+    svg.appendChild(ln);
+  }
+  // Hands
+  function hand(len, w, color) {
+    let h = document.createElementNS(NS, "line");
+    h.setAttribute("x1", "45"); h.setAttribute("y1", "45");
+    h.setAttribute("x2", "45"); h.setAttribute("y2", 45 - len);
+    h.setAttribute("stroke", color);
+    h.setAttribute("stroke-width", w);
+    h.setAttribute("stroke-linecap", "round");
+    svg.appendChild(h);
+    return h;
+  }
+  let hourH = hand(20, 3.5, "#e5e7eb");
+  let minH = hand(28, 2.5, "#e5e7eb");
+  let secH = hand(32, 1.5, "#4ade80");
+  let dot = document.createElementNS(NS, "circle");
+  dot.setAttribute("cx", "45"); dot.setAttribute("cy", "45"); dot.setAttribute("r", "3");
+  dot.setAttribute("fill", "#4ade80");
+  svg.appendChild(dot);
   let dateEl = E('div', {
-    style: `
-      font-size:12px;
-      opacity:.75;
-      min-height:18px;
-    `
+    style: `font-size:12px;opacity:.75;min-height:18px;margin-top:4px;`
   }, "");
+  let wrap = E('div', {
+    style: 'position:relative;width:90px;height:90px;margin:auto;'
+  }, [svg]);
   let box = E('div', {
     style: `
       width:140px;
@@ -215,15 +248,20 @@ function buildClock() {
         margin-bottom:6px;
         opacity:.85;
       `
-  }, "Jam"), timeEl, dateEl]);
-  return { box, timeEl, dateEl };
+  }, "Jam"), wrap, dateEl]);
+  return { box, hourH, minH, secH, dateEl };
 }
 
 function updateClock() {
   let now = new Date();
-  let p2 = (n) => String(n).padStart(2, '0');
-  if (window._clockTime)
-    window._clockTime.textContent = p2(now.getHours()) + ":" + p2(now.getMinutes()) + ":" + p2(now.getSeconds());
+  let sec = now.getSeconds() + now.getMilliseconds() / 1000;
+  let min = now.getMinutes() + sec / 60;
+  let hr = (now.getHours() % 12) + min / 60;
+  if (window._clockHands) {
+    window._clockHands.secH.setAttribute("transform", "rotate(" + (sec * 6) + " 45 45)");
+    window._clockHands.minH.setAttribute("transform", "rotate(" + (min * 6) + " 45 45)");
+    window._clockHands.hourH.setAttribute("transform", "rotate(" + (hr * 30) + " 45 45)");
+  }
   let days = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
   let months = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
   if (window._clockDate)
@@ -366,7 +404,7 @@ return baseclass.extend({
       let boxes = [];
       // Digital clock (replaces hidden CPU Temp gauge)
       let clk = buildClock();
-      window._clockTime = clk.timeEl;
+      window._clockHands = { hourH: clk.hourH, minH: clk.minH, secH: clk.secH };
       window._clockDate = clk.dateEl;
       boxes.push(clk.box);
       updateClock();
