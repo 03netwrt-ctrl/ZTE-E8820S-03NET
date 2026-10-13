@@ -24,7 +24,7 @@ Wi-Fi password  : (see release notes)
   custom wallpaper on the login page
 - **Terminal**: `ttyd` + `luci-app-ttyd`
 - **File manager**: TinyFM (`luci-app-tinyfm`, by bobbyunknown)
-- **Extra tools**: ZeroTier (`luci-app-zerotier`), DiskMan (`luci-app-diskman`)
+- **Extra tools**: Tailscale (`luci-app-tailscale`), DiskMan (`luci-app-diskman`)
 - **Modem drivers**: `kmod-usb-serial-*` (option, qualcomm, sierrawireless,
   wwan), `kmod-usb-net-*` (qmi-wwan, mbim, rndis, cdc-ncm, huawei),
   `usb-modeswitch`, ModemManager + `luci-proto-modemmanager`, sms-tool
