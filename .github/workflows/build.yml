@@ -13,13 +13,9 @@ on:
         description: 'Mark the release as pre-release'
         default: true
         type: boolean
-  push:
-    branches: [ main ]
-    paths:
-      - 'config/**'
-      - 'patch/**'
-      - 'overlay/**'
-      - '.github/workflows/**'
+
+# NOTE: no push trigger on purpose — builds only run on manual dispatch
+# (user instruction: "jangan asal build, tunggu perintah saya")
 
 permissions:
   contents: write
