@@ -1,0 +1,172 @@
+name: Build 03NET OpenWrt Firmware
+run-name: Build 03NET firmware for ZTE E8820S (${{ inputs.openwrt_version || 'v24.10.8' }})
+
+on:
+  workflow_dispatch:
+    inputs:
+      openwrt_version:
+        description: 'OpenWrt version tag (e.g., v24.10.8)'
+        required: true
+        default: 'v24.10.8'
+        type: string
+      is_prerelease:
+        description: 'Mark the release as pre-release'
+        default: true
+        type: boolean
+  push:
+    branches: [ main ]
+    paths:
+      - 'config/**'
+      - 'patch/**'
+      - 'overlay/**'
+      - '.github/workflows/**'
+
+permissions:
+  contents: write
+
+env:
+  REPO_URL: https://github.com/openwrt/openwrt
+  OPENWRT_TARGET: ramips/mt7621
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v6
+
+    - name: Free disk space
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /usr/local/lib/android
+        sudo rm -rf /opt/ghc
+        sudo apt-get clean
+
+    - name: Install build dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y build-essential clang flex bison g++ gawk \
+          gcc-multilib g++-multilib gettext git libncurses5-dev libssl-dev \
+          python3-setuptools rsync swig unzip zlib1g-dev file wget zstd
+
+    - name: Resolve toolchain URLs
+      id: urls
+      run: |
+        VER="${{ inputs.openwrt_version || 'v24.10.8' }}"
+        VERNUM="${VER#v}"
+        BASE="https://downloads.openwrt.org/releases/$VERNUM/targets/ramips/mt7621"
+        TC=$(curl -s "$BASE/" | grep -oE 'openwrt-toolchain-[^"]+\.tar\.zst' | head -1)
+        LLVM=$(curl -s "$BASE/" | grep -oE 'llvm-bpf-[^"]+\.tar\.zst' | head -1)
+        if [ -z "$TC" ] || [ -z "$LLVM" ]; then
+          echo "Failed to resolve toolchain URLs for $VER"
+          exit 1
+        fi
+        echo "toolchain_url=$BASE/$TC" >> $GITHUB_OUTPUT
+        echo "llvm_url=$BASE/$LLVM" >> $GITHUB_OUTPUT
+        echo "openwrt_tag=$VER" >> $GITHUB_OUTPUT
+        echo "base_url=$BASE" >> $GITHUB_OUTPUT
+
+    - name: Clone OpenWrt source
+      run: git clone --depth 1 $REPO_URL -b ${{ steps.urls.outputs.openwrt_tag }} openwrt
+
+    - name: Download external toolchain
+      run: |
+        mkdir -p /opt/toolchain
+        echo "Toolchain: ${{ steps.urls.outputs.toolchain_url }}"
+        wget -q "${{ steps.urls.outputs.toolchain_url }}" -O toolchain.tar.zst
+        tar -xf toolchain.tar.zst -C /opt/toolchain --strip-components=2 --wildcards "*/toolchain-mipsel_24kc_gcc-*"
+        rm toolchain.tar.zst
+        echo "LLVM: ${{ steps.urls.outputs.llvm_url }}"
+        wget -q "${{ steps.urls.outputs.llvm_url }}" -O llvm.tar.zst
+        tar -xf llvm.tar.zst -C ./openwrt
+        rm llvm.tar.zst
+
+    - name: Apply ZTE E8820S patches
+      run: |
+        cp patch/mt7621_zte_e8820s.dts openwrt/target/linux/ramips/dts/
+        sed -i '/esac/e cat patch/leds.txt' openwrt/target/linux/ramips/mt7621/base-files/etc/board.d/01_leds
+        sed -i '72r patch/upgrade.txt' openwrt/target/linux/ramips/mt7621/base-files/lib/upgrade/platform.sh
+        cat patch/zte.txt >> openwrt/target/linux/ramips/image/mt7621.mk
+        cp patch/99-default-settings openwrt/package/base-files/files/etc/uci-defaults/
+        mkdir -p openwrt/files
+        cp -r overlay/* openwrt/files/
+
+    - name: Add TinyFM file manager package
+      run: git clone --depth 1 https://github.com/bobbyunknown/luci-app-tinyfm openwrt/package/luci-app-tinyfm
+
+    - name: Update and install feeds
+      working-directory: ./openwrt
+      run: |
+        ./scripts/feeds update -a
+        ./scripts/feeds install -a
+
+    - name: Apply 03NET config and inject toolchain
+      working-directory: ./openwrt
+      run: |
+        cp ../config/03net.config .config
+        ./scripts/ext-toolchain.sh --toolchain /opt/toolchain --overwrite-config --config ${{ env.OPENWRT_TARGET }}
+        make defconfig
+        grep -E "CONFIG_TARGET_ramips_mt7621_DEVICE_zte_e8820s|CONFIG_VERSION_DIST|CONFIG_PACKAGE_luci-app-ttyd|CONFIG_PACKAGE_luci-app-tinyfm" .config
+
+    - name: Download packages
+      working-directory: ./openwrt
+      run: |
+        make download -j8
+        find dl -size -1024c -delete
+
+    - name: Compile firmware
+      working-directory: ./openwrt
+      run: |
+        echo "$(nproc) thread compile"
+        make -j$(nproc) || make -j1 V=s
+        rm -rf bin/targets/ramips/mt7621/packages
+
+    - name: Check vermagic
+      id: vermagic
+      run: |
+        JSON_FILE="openwrt/bin/targets/ramips/mt7621/profiles.json"
+        VERMAGIC=$(grep -oP '"vermagic":"\K[^"]+' "$JSON_FILE")
+        BASE_URL="${{ steps.urls.outputs.base_url }}"
+        if curl -s "$BASE_URL/kmods/" | grep -q "$VERMAGIC"; then
+          echo "result=$VERMAGIC | MATCHED with official OpenWrt build" >> $GITHUB_OUTPUT
+        else
+          echo "result=$VERMAGIC | MISMATCH with official OpenWrt build" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Generate release tag
+      id: tag
+      run: |
+        VER="${{ inputs.openwrt_version || 'v24.10.8' }}"
+        STAMP=$(date +'%Y.%m.%d-%H%M')
+        echo "release_tag=03net-${VER}-${STAMP}" >> $GITHUB_OUTPUT
+        echo "release_name=03NET ZTE E8820S ${VER} (${STAMP})" >> $GITHUB_OUTPUT
+
+    - name: Publish release
+      uses: softprops/action-gh-release@v2.6.1
+      with:
+        tag_name: ${{ steps.tag.outputs.release_tag }}
+        name: ${{ steps.tag.outputs.release_name }}
+        prerelease: ${{ inputs.is_prerelease != false }}
+        files: openwrt/bin/targets/ramips/mt7621/*
+        body: |
+          ## 03NET OpenWrt Firmware for ZTE E8820S
+
+          Custom build with 03NET branding, ttyd terminal, TinyFM file manager,
+          and modem drivers (usb-serial, usb-net QMI/MBIM/RNDIS, usb-modeswitch,
+          ModemManager, sms-tool).
+
+          - OpenWrt version: ${{ inputs.openwrt_version || 'v24.10.8' }}
+          - Vermagic: ${{ steps.vermagic.outputs.result }}
+          - Compiled using pre-compiled official OpenWrt toolchain
+
+          ### Default login
+          - LuCI: http://192.168.1.1 — user `root`, no password
+          - WiFi SSID: `03NET` — password: `12345678`
+
+          ### Install (BREED only)
+          1. Reboot to BREED web recovery (hold reset ~5s while powering on)
+          2. Connect via LAN1, open http://192.168.1.1
+          3. Flash `openwrt-*-ramips-mt7621-zte_e8820s-squashfs-factory.bin` with HC5962 layout
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
