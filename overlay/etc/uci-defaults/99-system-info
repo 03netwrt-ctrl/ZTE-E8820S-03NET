@@ -1,0 +1,24 @@
+#!/bin/sh
+
+FILES="
+/www/luci-static/resources/view/status/include/10_system.js
+/www/luci-static/resources/view/status/include/20_memory.js
+/www/luci-static/resources/view/status/include/25_storage.js
+/www/luci-static/resources/view/status/include/29_ports.js
+/www/luci-static/resources/view/status/include/30_network.js
+/www/luci-static/resources/view/status/include/40_dhcp.js
+/www/luci-static/resources/view/status/include/60_wifi.js
+"
+
+for f in $FILES; do
+    if [ -f "$f" ]; then
+        mv "$f" "$f.bak"
+    fi
+done
+
+chmod +x /usr/libexec/rpcd/cputemp 2>/dev/null
+
+/etc/init.d/rpcd restart
+/etc/init.d/uhttpd restart
+
+exit 0
