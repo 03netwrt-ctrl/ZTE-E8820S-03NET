@@ -2,23 +2,39 @@
 # Beware! This script will be in /rom/etc/uci-defaults/ as part of the image.
 # It runs once at first boot.
 
-wlan_name="03NET"
-wlan_password=<redacted>
+# --- Root password: "ikan" (SHA-512 hash, generated at build config time) ---
+sed -i 's|^root:[^:]*:|root:$6$TPPSmQ5JdhVHOdr4$MRDAJic1llCjcrzo9H3bwwn.ohlQsks7Kw6I.sqvCS7FXQegVfMRWn7wSHr2a0DlkgaAzYcqbRcG66AOu.ZjQ1:|' /etc/shadow
 
-# Hostname branding
+# --- Hostname branding ---
 uci set system.@system[0].hostname='03NET-E8820S'
 uci commit system
 
-# Configure WLAN on both radios (2.4GHz + 5GHz)
-# More options: https://openwrt.org/docs/guide-user/network/wifi/basic#wi-fi_interfaces
-if [ -n "$wlan_name" -a -n "$wlan_password" -a ${#wlan_password} -ge 8 ]; then
-  for idx in 0 1; do
-    if uci -q get wireless.@wifi-iface[$idx] >/dev/null 2>&1; then
-      uci set wireless.@wifi-iface[$idx].disabled='0'
-      uci set wireless.@wifi-iface[$idx].encryption='psk2'
-      uci set wireless.@wifi-iface[$idx].ssid="$wlan_name"
-      uci set wireless.@wifi-iface[$idx].key="$wlan_password"
-    fi
+# --- Default LuCI theme: material ---
+if uci -q get luci.themes.Material >/dev/null 2>&1; then
+  uci set luci.main.mediaurlbase='/luci-static/material'
+  uci commit luci
+fi
+
+# --- WiFi: 2.4GHz = 03NET-WRT, 5GHz = 03NET-WRT 5G ---
+# NOTE: WPA2 needs at least 8 characters — set wlan_password below!
+wlan_password="GANTI_DENGAN_PASSWORD_WIFI_MIN_8_KARAKTER"
+
+if [ -n "$wlan_password" -a ${#wlan_password} -ge 8 ]; then
+  for dev in $(uci show wireless 2>/dev/null | sed -n 's/^wireless\.\([^.=]*\)=wifi-device/\1/p'); do
+    band="$(uci -q get wireless.$dev.band)"
+    case "$band" in
+      2g) ssid="03NET-WRT" ;;
+      5g) ssid="03NET-WRT 5G" ;;
+      *)  ssid="03NET-WRT" ;;
+    esac
+    for iface in $(uci show wireless 2>/dev/null | sed -n 's/^wireless\.\([^.=]*\)=wifi-iface/\1/p'); do
+      [ "$(uci -q get wireless.$iface.device)" = "$dev" ] || continue
+      # More options: https://openwrt.org/docs/guide-user/network/wifi/basic
+      uci set wireless.$iface.disabled='0'
+      uci set wireless.$iface.encryption='psk2'
+      uci set wireless.$iface.ssid="$ssid"
+      uci set wireless.$iface.key="$wlan_password"
+    done
   done
   uci commit wireless
 fi
