@@ -51,11 +51,12 @@ case "$1" in
                 [ -f /tmp/speedtestgo_status.txt ] && s=$(cat /tmp/speedtestgo_status.txt)
                 json_init
                 json_add_string status "$s"
+                # Always include result field (empty if not DONE) for RPC expect validation
+                r=""
                 if [ "$s" = "DONE" ] && [ -f /tmp/speedtestgo_result.json ]; then
-                    # Include result JSON as string
                     r=$(cat /tmp/speedtestgo_result.json 2>/dev/null)
-                    json_add_string result "$r"
                 fi
+                json_add_string result "$r"
                 json_dump
                 ;;
         esac
