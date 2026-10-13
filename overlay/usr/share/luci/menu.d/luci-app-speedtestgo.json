@@ -1,0 +1,1 @@
+{"admin/services/speedtest":{"action":{"path":"speedtestgo","type":"view"},"depends":{"acl":["luci-app-speedtestgo"]},"order":99,"title":"Speedtest"}}

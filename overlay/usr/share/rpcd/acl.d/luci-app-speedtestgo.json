@@ -1,0 +1,1 @@
+{"luci-app-speedtestgo":{"description":"Speedtest-go LuCI app (03NET)","read":{"ubus":{"speedtestgo":["status"]}},"write":{"ubus":{"speedtestgo":["run"]}}}}

@@ -1,0 +1,63 @@
+#!/bin/sh
+# 03NET-WRT speedtest-go rpcd provider
+# Provides: run, status methods via ubus
+
+. /usr/share/libubox/jshn.sh
+
+BIN="/usr/bin/speedtest-go"
+[ -x "$BIN" ] || BIN="/usr/sbin/speedtest-go"
+
+case "$1" in
+    list)
+        echo '{"run":{},"status":{}}'
+        ;;
+    call)
+        case "$2" in
+            run)
+                if [ ! -x "$BIN" ]; then
+                    json_init
+                    json_add_string status "error"
+                    json_add_string message "speedtest-go not installed"
+                    json_dump
+                    exit 0
+                fi
+                # Check if already running
+                if [ -f /tmp/speedtestgo_status.txt ]; then
+                    s=$(cat /tmp/speedtestgo_status.txt 2>/dev/null)
+                    if [ "$s" = "RUNNING" ]; then
+                        json_init
+                        json_add_string status "already_running"
+                        json_dump
+                        exit 0
+                    fi
+                fi
+                rm -f /tmp/speedtestgo_result.json
+                echo "RUNNING" > /tmp/speedtestgo_status.txt
+                # Run in background
+                (
+                    "$BIN" --json > /tmp/speedtestgo_result.json 2>/tmp/speedtestgo.log
+                    if [ $? -eq 0 ] && [ -s /tmp/speedtestgo_result.json ]; then
+                        echo "DONE" > /tmp/speedtestgo_status.txt
+                    else
+                        echo "ERROR" > /tmp/speedtestgo_status.txt
+                    fi
+                ) &
+                json_init
+                json_add_string status "started"
+                json_dump
+                ;;
+            status)
+                s="IDLE"
+                [ -f /tmp/speedtestgo_status.txt ] && s=$(cat /tmp/speedtestgo_status.txt)
+                json_init
+                json_add_string status "$s"
+                if [ "$s" = "DONE" ] && [ -f /tmp/speedtestgo_result.json ]; then
+                    # Include result JSON as string
+                    r=$(cat /tmp/speedtestgo_result.json 2>/dev/null)
+                    json_add_string result "$r"
+                fi
+                json_dump
+                ;;
+        esac
+        ;;
+esac
