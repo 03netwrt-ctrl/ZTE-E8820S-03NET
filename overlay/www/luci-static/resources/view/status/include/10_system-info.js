@@ -182,6 +182,54 @@ function buildGauge(label) {
   }
 }
 
+function buildClock() {
+  let timeEl = E('div', {
+    style: `
+      font-size:26px;
+      font-weight:700;
+      font-variant-numeric:tabular-nums;
+      letter-spacing:1px;
+      margin:14px 0 6px;
+      font-family:monospace;
+    `
+  }, "--:--:--");
+  let dateEl = E('div', {
+    style: `
+      font-size:12px;
+      opacity:.75;
+      min-height:18px;
+    `
+  }, "");
+  let box = E('div', {
+    style: `
+      width:140px;
+      margin:auto;
+      padding:12px 6px;
+      text-align:center;
+      ${glass()}
+    `
+  }, [E('div', {
+    style: `
+        font-weight:600;
+        font-size:13px;
+        margin-bottom:6px;
+        opacity:.85;
+      `
+  }, "Jam"), timeEl, dateEl]);
+  return { box, timeEl, dateEl };
+}
+
+function updateClock() {
+  let now = new Date();
+  let p2 = (n) => String(n).padStart(2, '0');
+  if (window._clockTime)
+    window._clockTime.textContent = p2(now.getHours()) + ":" + p2(now.getMinutes()) + ":" + p2(now.getSeconds());
+  let days = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+  let months = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+  if (window._clockDate)
+    window._clockDate.textContent = days[now.getDay()] + ", " + now.getDate() + " " + months[now.getMonth()];
+}
+
 function buildConnGauge() {
   let text = E('div', {
     style: `
@@ -316,6 +364,13 @@ return baseclass.extend({
     let gNet = Math.min(100, (mbps / MAX_MBPS) * 100);
     if (!uiBuilt) {
       let boxes = [];
+      // Digital clock (replaces hidden CPU Temp gauge)
+      let clk = buildClock();
+      window._clockTime = clk.timeEl;
+      window._clockDate = clk.dateEl;
+      boxes.push(clk.box);
+      updateClock();
+      if (!window._clockTimer) window._clockTimer = setInterval(updateClock, 1000);
       // Hide CPU Temp gauge when no thermal sensor (MT7621 has none)
       if (t > 0) {
         let g1 = buildGauge("CPU Temp");
