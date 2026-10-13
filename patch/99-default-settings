@@ -1,0 +1,26 @@
+# 03NET default settings for ZTE E8820S
+# Beware! This script will be in /rom/etc/uci-defaults/ as part of the image.
+# It runs once at first boot.
+
+wlan_name="03NET"
+wlan_password=<redacted>
+
+# Hostname branding
+uci set system.@system[0].hostname='03NET-E8820S'
+uci commit system
+
+# Configure WLAN on both radios (2.4GHz + 5GHz)
+# More options: https://openwrt.org/docs/guide-user/network/wifi/basic#wi-fi_interfaces
+if [ -n "$wlan_name" -a -n "$wlan_password" -a ${#wlan_password} -ge 8 ]; then
+  for idx in 0 1; do
+    if uci -q get wireless.@wifi-iface[$idx] >/dev/null 2>&1; then
+      uci set wireless.@wifi-iface[$idx].disabled='0'
+      uci set wireless.@wifi-iface[$idx].encryption='psk2'
+      uci set wireless.@wifi-iface[$idx].ssid="$wlan_name"
+      uci set wireless.@wifi-iface[$idx].key="$wlan_password"
+    fi
+  done
+  uci commit wireless
+fi
+
+echo "All done!"
