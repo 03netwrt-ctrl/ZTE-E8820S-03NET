@@ -49,13 +49,26 @@ return view.extend({
         var showResults = function(jsonStr) {
             try {
                 var r = JSON.parse(jsonStr);
-                var dl = (r.download && r.download.bandwidth) ? (r.download.bandwidth * 8 / 1e6).toFixed(1) : '-';
-                var ul = (r.upload && r.upload.bandwidth) ? (r.upload.bandwidth * 8 / 1e6).toFixed(1) : '-';
-                var ping = (r.ping && r.ping.latency != null) ? parseFloat(r.ping.latency).toFixed(1) : '-';
-                var jitter = (r.ping && r.ping.jitter != null) ? parseFloat(r.ping.jitter).toFixed(1) : '-';
-                var server = '-';
-                if (r.server) server = (r.server.sponsor || '') + ' - ' + (r.server.name || '');
-                var isp = (r.client && r.client.isp) ? r.client.isp : '-';
+                var dl = '-', ul = '-', ping = '-', jitter = '-', server = '-', isp = '-';
+                // Format 1: servers[] array (actual speedtest-go output)
+                var sv = (r.servers && r.servers.length) ? r.servers[0] : null;
+                if (sv) {
+                    if (sv.dl_speed) dl = (sv.dl_speed * 8 / 1e6).toFixed(1);
+                    if (sv.ul_speed) ul = (sv.ul_speed * 8 / 1e6).toFixed(1);
+                    if (sv.latency) ping = (sv.latency / 1e6).toFixed(1);
+                    if (sv.jitter) jitter = (sv.jitter / 1e6).toFixed(1);
+                    server = (sv.sponsor || '') + ' - ' + (sv.name || '');
+                }
+                // Format 2: flat download/upload/ping (fallback)
+                else {
+                    if (r.download && r.download.bandwidth) dl = (r.download.bandwidth * 8 / 1e6).toFixed(1);
+                    if (r.upload && r.upload.bandwidth) ul = (r.upload.bandwidth * 8 / 1e6).toFixed(1);
+                    if (r.ping && r.ping.latency != null) ping = parseFloat(r.ping.latency).toFixed(1);
+                    if (r.ping && r.ping.jitter != null) jitter = parseFloat(r.ping.jitter).toFixed(1);
+                    if (r.server) server = (r.server.sponsor || '') + ' - ' + (r.server.name || '');
+                }
+                if (r.user_info && r.user_info.Isp) isp = r.user_info.Isp;
+                else if (r.client && r.client.isp) isp = r.client.isp;
 
                 document.getElementById('stgo-dl').textContent = dl;
                 document.getElementById('stgo-ul').textContent = ul;
@@ -142,6 +155,30 @@ return view.extend({
                 ])
             ])
         ]);
+
+        // Auto-check for existing completed test on page load
+        setTimeout(function() {
+            callStatus().then(function(r) {
+                if (r.status === 'DONE' && r.result) {
+                    var statusEl = document.getElementById('stgo-status');
+                    var res = document.getElementById('stgo-results');
+                    try {
+                        var jr = JSON.parse(r.result);
+                        var sv = (jr.servers && jr.servers.length) ? jr.servers[0] : null;
+                        if (sv) {
+                            document.getElementById('stgo-dl').textContent = sv.dl_speed ? (sv.dl_speed * 8 / 1e6).toFixed(1) : '-';
+                            document.getElementById('stgo-ul').textContent = sv.ul_speed ? (sv.ul_speed * 8 / 1e6).toFixed(1) : '-';
+                            document.getElementById('stgo-ping').textContent = sv.latency ? (sv.latency / 1e6).toFixed(1) : '-';
+                            document.getElementById('stgo-jitter').textContent = sv.jitter ? (sv.jitter / 1e6).toFixed(1) : '-';
+                            document.getElementById('stgo-server').textContent = (sv.sponsor || '') + ' - ' + (sv.name || '');
+                            if (jr.user_info && jr.user_info.Isp) document.getElementById('stgo-isp').textContent = jr.user_info.Isp;
+                            res.style.display = 'block';
+                            statusEl.textContent = _('Hasil tes terakhir');
+                        }
+                    } catch (e) {}
+                }
+            }).catch(function() {});
+        }, 500);
 
         return E('div', {}, [style, card]);
     },
