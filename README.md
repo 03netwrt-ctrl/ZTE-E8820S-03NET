@@ -7,25 +7,29 @@ USB modem drivers.
 ## Default login
 
 ```
-LuCI       : http://192.168.1.1
-user       : root
-password   : (empty, just hit enter)
+LuCI            : http://192.168.1.1
+user            : root
+password        : ikan
 
-Wi-Fi SSID : 03NET
-Password   : 12345678
+Wi-Fi 2.4GHz    : 03NET-WRT
+Wi-Fi 5GHz      : 03NET-WRT 5G
+Wi-Fi password  : (see release notes)
 ```
 
 ## What's inside
 
 - Base: official OpenWrt (ramips/mt7621), built with the official pre-compiled
   toolchain so kernel modules match official OpenWrt builds
+- **Theme**: material (default), with 03NET-WRT logo in the header and a
+  custom wallpaper on the login page
 - **Terminal**: `ttyd` + `luci-app-ttyd`
 - **File manager**: TinyFM (`luci-app-tinyfm`, by bobbyunknown)
+- **Extra tools**: ZeroTier (`luci-app-zerotier`), DiskMan (`luci-app-diskman`)
 - **Modem drivers**: `kmod-usb-serial-*` (option, qualcomm, sierrawireless,
   wwan), `kmod-usb-net-*` (qmi-wwan, mbim, rndis, cdc-ncm, huawei),
   `usb-modeswitch`, ModemManager + `luci-proto-modemmanager`, sms-tool
 - **USB storage**: `kmod-usb-storage`, `block-mount`
-- Branding: 03NET banner, hostname `03NET-E8820S`, WiFi SSID `03NET`
+- Branding: 03NET banner, hostname `03NET-E8820S`
 
 ## Installation
 
@@ -51,7 +55,8 @@ Actions build:
 
 - `config/03net.config` - package selection + 03NET branding
 - `patch/` - device tree, LED, sysupgrade and image definitions for E8820S
-- `overlay/` - files copied into the firmware image (e.g. /etc/banner)
+- `overlay/` - files copied into the firmware image (banner, LuCI logo,
+  login wallpaper)
 - TinyFM is cloned at build time from bobbyunknown/luci-app-tinyfm
 
 To change the OpenWrt version, run the workflow manually with another tag
