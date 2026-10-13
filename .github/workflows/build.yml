@@ -101,6 +101,27 @@ jobs:
         ./scripts/feeds update -a
         ./scripts/feeds install -a
 
+    - name: Brand LuCI login page (One Piece wallpaper)
+      working-directory: ./openwrt
+      run: |
+        python3 - <<'PYEOF'
+        p = "feeds/luci/modules/luci-base/ucode/template/sysauth.ut"
+        s = open(p).read()
+        css = (
+            "<style>\n"
+            "body.node-main-login{background:url('/luci-static/material/login-bg.jpg') "
+            "no-repeat center center fixed !important;background-size:cover !important}\n"
+            "body.node-main-login .cbi-map{box-shadow:0 8px 32px rgba(0,0,0,.45)}\n"
+            "</style>\n"
+        )
+        marker = "{% include('header') %}"
+        assert marker in s, "sysauth.ut marker not found"
+        assert "login-bg.jpg" not in s, "already patched"
+        s = s.replace(marker, marker + "\n" + css, 1)
+        open(p, "w").write(s)
+        print("login background injected into sysauth.ut")
+        PYEOF
+
     - name: Apply 03NET config and inject toolchain
       working-directory: ./openwrt
       run: |
@@ -152,17 +173,18 @@ jobs:
         body: |
           ## 03NET OpenWrt Firmware for ZTE E8820S
 
-          Custom build with 03NET branding, ttyd terminal, TinyFM file manager,
-          and modem drivers (usb-serial, usb-net QMI/MBIM/RNDIS, usb-modeswitch,
-          ModemManager, sms-tool).
+          Custom build with 03NET branding, material theme, ttyd terminal,
+          TinyFM file manager, and modem drivers (usb-serial, usb-net
+          QMI/MBIM/RNDIS, usb-modeswitch, ModemManager, sms-tool).
 
           - OpenWrt version: ${{ inputs.openwrt_version || 'v24.10.8' }}
           - Vermagic: ${{ steps.vermagic.outputs.result }}
           - Compiled using pre-compiled official OpenWrt toolchain
 
           ### Default login
-          - LuCI: http://192.168.1.1 — user `root`, no password
-          - WiFi SSID: `03NET` — password: `12345678`
+          - LuCI: http://192.168.1.1 — user `root`, password `ikan`
+          - WiFi 2.4GHz SSID: `03NET-WRT`
+          - WiFi 5GHz SSID: `03NET-WRT 5G`
 
           ### Install (BREED only)
           1. Reboot to BREED web recovery (hold reset ~5s while powering on)
