@@ -16,8 +16,8 @@ if uci -q get luci.themes.Material >/dev/null 2>&1; then
 fi
 
 # --- WiFi: 2.4GHz = 03NET-WRT, 5GHz = 03NET-WRT 5G ---
-# NOTE: WPA2 needs at least 8 characters — set wlan_password below!
-wlan_password="GANTI_DENGAN_PASSWORD_WIFI_MIN_8_KARAKTER"
+# NOTE: WPA2 needs at least 8 characters!
+wlan_password="03netwrt"
 
 if [ -n "$wlan_password" -a ${#wlan_password} -ge 8 ]; then
   for dev in $(uci show wireless 2>/dev/null | sed -n 's/^wireless\.\([^.=]*\)=wifi-device/\1/p'); do
