@@ -47,7 +47,7 @@ fi
 
 # --- ttyd: skip login prompt, straight to root shell ---
 for _s in $(uci show ttyd 2>/dev/null | sed -n 's/^ttyd\.\([^.=]*\)=ttyd/\1/p'); do
-  uci set ttyd.$_s.command='/bin/login -f root'
+  uci set ttyd.$_s.command='/bin/sh -l'
 done
 uci commit ttyd 2>/dev/null
 
