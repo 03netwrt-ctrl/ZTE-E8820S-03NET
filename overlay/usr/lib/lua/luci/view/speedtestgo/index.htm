@@ -1,0 +1,172 @@
+<%+header%>
+
+<style>
+.stgo-card {
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.08);
+    padding: 30px;
+    max-width: 600px;
+    margin: 20px auto;
+    text-align: center;
+}
+.stgo-btn {
+    width: 150px;
+    height: 150px;
+    border-radius: 50%;
+    border: 4px solid #00a6ff;
+    background: transparent;
+    color: #00a6ff;
+    font-size: 28px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: .3s;
+    margin: 20px auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.stgo-btn:hover:not(:disabled) {
+    transform: scale(1.05);
+    box-shadow: 0 0 25px rgba(0,166,255,.4);
+}
+.stgo-btn:disabled {
+    opacity: .5;
+    cursor: wait;
+}
+.stgo-results {
+    display: none;
+    margin-top: 20px;
+    text-align: left;
+}
+.stgo-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid #eee;
+}
+.stgo-row .label { color: #64748b; }
+.stgo-row .value { font-weight: 700; font-size: 18px; }
+.stgo-big {
+    font-size: 42px;
+    font-weight: 800;
+    color: #00a6ff;
+    margin: 10px 0;
+}
+.stgo-status { color: #64748b; margin: 15px 0; min-height: 24px; }
+.spinner {
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #00a6ff;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+    margin: 20px auto;
+    display: none;
+}
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+</style>
+
+<div class="stgo-card">
+    <h2>Speedtest</h2>
+    <p style="color:#64748b">Test kecepatan internet via speedtest.net</p>
+
+    <button class="stgo-btn" id="btn-start" onclick="startTest()">GO</button>
+    <div class="spinner" id="spinner"></div>
+    <div class="stgo-status" id="status"></div>
+
+    <div class="stgo-results" id="results">
+        <div style="text-align:center">
+            <div style="color:#64748b">Download</div>
+            <div class="stgo-big"><span id="r-dl">-</span> <span style="font-size:20px">Mbps</span></div>
+        </div>
+        <div class="stgo-row"><span class="label">Upload</span><span class="value"><span id="r-ul">-</span> Mbps</span></div>
+        <div class="stgo-row"><span class="label">Ping</span><span class="value"><span id="r-ping">-</span> ms</span></div>
+        <div class="stgo-row"><span class="label">Jitter</span><span class="value"><span id="r-jitter">-</span> ms</span></div>
+        <div class="stgo-row"><span class="label">Server</span><span class="value" id="r-server" style="font-size:14px">-</span></div>
+        <div class="stgo-row"><span class="label">ISP</span><span class="value" id="r-isp" style="font-size:14px">-</span></div>
+    </div>
+</div>
+
+<script>
+var checkTimer = null;
+var startTime = 0;
+
+function startTest() {
+    document.getElementById('btn-start').disabled = true;
+    document.getElementById('btn-start').style.display = 'none';
+    document.getElementById('spinner').style.display = 'block';
+    document.getElementById('results').style.display = 'none';
+    document.getElementById('status').textContent = 'Memulai tes...';
+    startTime = Date.now();
+
+    fetch('<%=luci.dispatcher.build_url("admin", "services", "speedtestgo", "start")%>')
+        .then(r => r.json())
+        .then(d => {
+            if (d.status === 'error') {
+                document.getElementById('status').textContent = d.log;
+                resetUI();
+                return;
+            }
+            checkTimer = setInterval(checkStatus, 2000);
+        })
+        .catch(e => {
+            document.getElementById('status').textContent = 'Error: ' + e;
+            resetUI();
+        });
+}
+
+function checkStatus() {
+    var elapsed = Math.floor((Date.now() - startTime) / 1000);
+    document.getElementById('status').textContent = 'Menguji... (' + elapsed + 's)';
+
+    fetch('<%=luci.dispatcher.build_url("admin", "services", "speedtestgo", "check")%>')
+        .then(r => r.json())
+        .then(d => {
+            if (d.status === 'DONE') {
+                clearInterval(checkTimer);
+                showResults(d.result);
+            } else if (d.status === 'ERROR') {
+                clearInterval(checkTimer);
+                document.getElementById('status').textContent = 'Tes gagal. Cek koneksi internet.';
+                resetUI();
+            }
+        });
+}
+
+function showResults(jsonStr) {
+    try {
+        var r = JSON.parse(jsonStr);
+        // speedtest-go JSON: bandwidth in bytes/sec -> Mbps = *8/1e6
+        var dl = r.download && r.download.bandwidth ? (r.download.bandwidth * 8 / 1e6).toFixed(1) : '-';
+        var ul = r.upload && r.upload.bandwidth ? (r.upload.bandwidth * 8 / 1e6).toFixed(1) : '-';
+        var ping = r.ping && r.ping.latency ? parseFloat(r.ping.latency).toFixed(1) : '-';
+        var jitter = r.ping && r.ping.jitter ? parseFloat(r.ping.jitter).toFixed(1) : '-';
+        var server = '-';
+        if (r.server) server = (r.server.sponsor || '') + ' - ' + (r.server.name || '');
+        var isp = (r.client && r.client.isp) ? r.client.isp : '-';
+
+        document.getElementById('r-dl').textContent = dl;
+        document.getElementById('r-ul').textContent = ul;
+        document.getElementById('r-ping').textContent = ping;
+        document.getElementById('r-jitter').textContent = jitter;
+        document.getElementById('r-server').textContent = server;
+        document.getElementById('r-isp').textContent = isp;
+
+        document.getElementById('results').style.display = 'block';
+        document.getElementById('status').textContent = 'Selesai!';
+    } catch (e) {
+        document.getElementById('status').textContent = 'Gagal parse hasil: ' + e;
+    }
+    resetUI();
+}
+
+function resetUI() {
+    document.getElementById('btn-start').disabled = false;
+    document.getElementById('btn-start').style.display = 'flex';
+    document.getElementById('btn-start').textContent = 'GO';
+    document.getElementById('spinner').style.display = 'none';
+}
+</script>
+
+<%+footer%>
