@@ -41,6 +41,8 @@ if [ -n "$wlan_password" -a ${#wlan_password} -ge 8 ]; then
       uci set wireless.$iface.ssid="$ssid"
       uci set wireless.$iface.key="$wlan_password"
     done
+    # Enable the radio itself (this was missing — wifi stayed dead without it)
+    uci set wireless.$dev.disabled='0'
   done
   uci commit wireless
 fi
