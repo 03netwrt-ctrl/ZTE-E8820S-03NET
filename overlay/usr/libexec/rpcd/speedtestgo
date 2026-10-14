@@ -1,15 +1,23 @@
 #!/bin/sh
 # 03NET-WRT speedtest-go rpcd provider
-# Provides: run, status methods via ubus
+# Provides: run, status, progress methods via ubus
 
 . /usr/share/libubox/jshn.sh
 
 BIN="/usr/bin/speedtest-go"
 [ -x "$BIN" ] || BIN="/usr/sbin/speedtest-go"
 
+get_wan_if() {
+    # Try ubus first, fallback to default route
+    local wif=""
+    wif=$(ubus call network.interface.wan status 2>/dev/null | sed -n 's/.*"device":"\([^"]*\)".*/\1/p' | head -1)
+    [ -z "$wif" ] && wif=$(ip route show default 2>/dev/null | awk '{print $5}' | head -1)
+    echo "$wif"
+}
+
 case "$1" in
     list)
-        echo '{"run":{},"status":{}}'
+        echo '{"run":{},"status":{},"progress":{}}'
         ;;
     call)
         case "$2" in
@@ -21,7 +29,6 @@ case "$1" in
                     json_dump
                     exit 0
                 fi
-                # Check if already running
                 if [ -f /tmp/speedtestgo_status.txt ]; then
                     s=$(cat /tmp/speedtestgo_status.txt 2>/dev/null)
                     if [ "$s" = "RUNNING" ]; then
@@ -33,7 +40,14 @@ case "$1" in
                 fi
                 rm -f /tmp/speedtestgo_result.json
                 echo "RUNNING" > /tmp/speedtestgo_status.txt
-                # Run in background
+                # Init progress tracking: record WAN iface + initial counters
+                wif=$(get_wan_if)
+                echo "$wif" > /tmp/speedtestgo_wanif.txt
+                if [ -n "$wif" ]; then
+                    rx=$(cat /sys/class/net/$wif/statistics/rx_bytes 2>/dev/null || echo 0)
+                    tx=$(cat /sys/class/net/$wif/statistics/tx_bytes 2>/dev/null || echo 0)
+                    echo "$(date +%s) $rx $tx" > /tmp/speedtestgo_progress.txt
+                fi
                 (
                     "$BIN" --json > /tmp/speedtestgo_result.json 2>/tmp/speedtestgo.log
                     if [ $? -eq 0 ] && [ -s /tmp/speedtestgo_result.json ]; then
@@ -51,12 +65,46 @@ case "$1" in
                 [ -f /tmp/speedtestgo_status.txt ] && s=$(cat /tmp/speedtestgo_status.txt)
                 json_init
                 json_add_string status "$s"
-                # Always include result field (empty if not DONE) for RPC expect validation
                 r=""
                 if [ "$s" = "DONE" ] && [ -f /tmp/speedtestgo_result.json ]; then
                     r=$(cat /tmp/speedtestgo_result.json 2>/dev/null)
                 fi
                 json_add_string result "$r"
+                json_dump
+                ;;
+            progress)
+                # Live speed from WAN interface byte counters
+                wif=$(cat /tmp/speedtestgo_wanif.txt 2>/dev/null)
+                [ -z "$wif" ] && wif=$(get_wan_if)
+                dl="0"; ul="0"
+                if [ -n "$wif" ] && [ -f /tmp/speedtestgo_progress.txt ]; then
+                    read pts prx ptx < /tmp/speedtestgo_progress.txt 2>/dev/null
+                    now=$(date +%s)
+                    rx=$(cat /sys/class/net/$wif/statistics/rx_bytes 2>/dev/null || echo 0)
+                    tx=$(cat /sys/class/net/$wif/statistics/tx_bytes 2>/dev/null || echo 0)
+                    dt=$((now - pts))
+                    [ "$dt" -lt 1 ] && dt=1
+                    # Mbps = bytes * 8 / 1e6 / seconds
+                    dl=$(awk "BEGIN{printf \"%.1f\", ($rx - $prx) * 8 / 1000000 / $dt}")
+                    ul=$(awk "BEGIN{printf \"%.1f\", ($tx - $ptx) * 8 / 1000000 / $dt}")
+                    # Clamp negative (counter wrap)
+                    dl=$(awk "BEGIN{print ($dl < 0) ? 0 : $dl}")
+                    ul=$(awk "BEGIN{print ($ul < 0) ? 0 : $ul}")
+                    echo "$now $rx $tx" > /tmp/speedtestgo_progress.txt
+                fi
+                # Determine phase: which direction is faster
+                phase="idle"
+                is_dl=$(awk "BEGIN{print ($dl > $ul && $dl > 1)}")
+                is_ul=$(awk "BEGIN{print ($ul >= $dl && $ul > 1)}")
+                [ "$is_dl" = "1" ] && phase="download"
+                [ "$is_ul" = "1" ] && phase="upload"
+                s="IDLE"
+                [ -f /tmp/speedtestgo_status.txt ] && s=$(cat /tmp/speedtestgo_status.txt)
+                json_init
+                json_add_string status "$s"
+                json_add_string phase "$phase"
+                json_add_string download_mbps "$dl"
+                json_add_string upload_mbps "$ul"
                 json_dump
                 ;;
         esac

@@ -15,6 +15,12 @@ var callStatus = rpc.declare({
     expect: { '': {} }
 });
 
+var callProgress = rpc.declare({
+    object: 'speedtestgo',
+    method: 'progress',
+    expect: { '': {} }
+});
+
 function parseAndShow(r) {
     var dl = '-', ul = '-', ping = '-', jitter = '-', server = '-', isp = '-';
     try {
@@ -47,27 +53,85 @@ function parseAndShow(r) {
     return true;
 }
 
+// Update the live speed gauge
+function updateGauge(mbps, phase) {
+    var maxScale = 100;
+    // Auto-scale: use data-max attribute
+    var gauge = document.getElementById('stgo-gauge');
+    if (!gauge) return;
+    var curMax = parseFloat(gauge.getAttribute('data-max') || '100');
+    if (mbps > curMax * 0.9) {
+        curMax = Math.ceil(mbps * 1.2 / 50) * 50; // round up to 50
+        gauge.setAttribute('data-max', curMax);
+        document.getElementById('stgo-gauge-max').textContent = curMax;
+    }
+    maxScale = curMax;
+
+    var frac = Math.min(mbps / maxScale, 1);
+    // Arc: semicircle from 180deg to 0deg, radius 80, center (100,100)
+    // Active arc length
+    var arc = document.getElementById('stgo-arc-active');
+    if (arc) {
+        var r = 80;
+        var startAngle = 180, endAngle = 180 - (frac * 180);
+        var x1 = 100 + r * Math.cos(startAngle * Math.PI / 180);
+        var y1 = 100 - r * Math.sin(startAngle * Math.PI / 180);
+        var x2 = 100 + r * Math.cos(endAngle * Math.PI / 180);
+        var y2 = 100 - r * Math.sin(endAngle * Math.PI / 180);
+        var large = (frac > 0.5) ? 1 : 0;
+        if (frac <= 0.001) {
+            arc.setAttribute('d', 'M 20 100 A 80 80 0 0 1 20 100'); // empty
+        } else {
+            arc.setAttribute('d', 'M 20 100 A 80 80 0 ' + large + ' 1 ' + x2.toFixed(1) + ' ' + y2.toFixed(1));
+        }
+    }
+    // Needle
+    var needle = document.getElementById('stgo-needle');
+    if (needle) {
+        var ang = 180 - (frac * 180);
+        var nx = 100 + 65 * Math.cos(ang * Math.PI / 180);
+        var ny = 100 - 65 * Math.sin(ang * Math.PI / 180);
+        needle.setAttribute('x2', nx.toFixed(1));
+        needle.setAttribute('y2', ny.toFixed(1));
+    }
+    // Number
+    document.getElementById('stgo-live-speed').textContent = mbps.toFixed(1);
+    // Phase label
+    var phaseEl = document.getElementById('stgo-phase');
+    if (phaseEl) {
+        if (phase === 'download') { phaseEl.textContent = _('Download'); phaseEl.style.color = '#00a6ff'; }
+        else if (phase === 'upload') { phaseEl.textContent = _('Upload'); phaseEl.style.color = '#7c3aed'; }
+        else { phaseEl.textContent = _('Mengukur...'); phaseEl.style.color = '#64748b'; }
+    }
+}
+
 return view.extend({
     handleStart: function(ev) {
         var btn = document.getElementById('stgo-btn');
         var statusEl = document.getElementById('stgo-status');
         var spin = document.getElementById('stgo-spin');
         var res = document.getElementById('stgo-results');
+        var liveWrap = document.getElementById('stgo-live');
 
         btn.disabled = true;
         btn.style.display = 'none';
-        spin.style.display = 'block';
+        spin.style.display = 'none'; // use gauge instead
         res.style.display = 'none';
+        liveWrap.style.display = 'block';
         statusEl.textContent = _('Memulai tes...');
+        // Reset gauge
+        document.getElementById('stgo-gauge').setAttribute('data-max', '100');
+        document.getElementById('stgo-gauge-max').textContent = '100';
+        updateGauge(0, '');
 
         var startTime = Date.now();
         var timer = null;
-        var maxWait = 180; // 3 menit timeout
+        var maxWait = 180;
 
         var resetUI = function() {
             btn.disabled = false;
             btn.style.display = 'flex';
-            spin.style.display = 'none';
+            liveWrap.style.display = 'none';
         };
 
         var check = function() {
@@ -78,11 +142,22 @@ return view.extend({
                 resetUI();
                 return;
             }
-            statusEl.textContent = _('Menguji...') + ' (' + elapsed + 's)';
+            // Poll live progress for gauge
+            callProgress().then(function(p) {
+                if (p) {
+                    var spd = 0, ph = p.phase || '';
+                    if (ph === 'download') spd = parseFloat(p.download_mbps || 0);
+                    else if (ph === 'upload') spd = parseFloat(p.upload_mbps || 0);
+                    else spd = Math.max(parseFloat(p.download_mbps || 0), parseFloat(p.upload_mbps || 0));
+                    updateGauge(spd, ph);
+                }
+            }).catch(function() {});
+            // Poll status for completion
             callStatus().then(function(r) {
                 var st = r ? r.status : null;
                 if (st === 'DONE') {
                     clearInterval(timer);
+                    updateGauge(0, '');
                     if (r.result && parseAndShow(r.result)) {
                         statusEl.textContent = _('Selesai!');
                     } else {
@@ -93,8 +168,9 @@ return view.extend({
                     clearInterval(timer);
                     statusEl.textContent = _('Tes gagal. Cek koneksi internet.');
                     resetUI();
+                } else {
+                    statusEl.textContent = _('Menguji...') + ' (' + elapsed + 's)';
                 }
-                // else still RUNNING, keep polling
             }).catch(function(e) {
                 clearInterval(timer);
                 statusEl.textContent = _('Error RPC: ') + e;
@@ -109,7 +185,7 @@ return view.extend({
                 resetUI();
                 return;
             }
-            timer = setInterval(check, 2000);
+            timer = setInterval(check, 1000);
             check();
         }).catch(function(e) {
             statusEl.textContent = _('Error: ') + e;
@@ -129,16 +205,39 @@ return view.extend({
         .stgo-row .val{font-weight:700;font-size:18px}\
         .stgo-big{font-size:42px;font-weight:800;color:#00a6ff;margin:10px 0}\
         .stgo-status{color:#64748b;margin:15px 0;min-height:24px}\
-        .stgo-spin{border:4px solid #f3f3f3;border-top:4px solid #00a6ff;border-radius:50%;width:40px;height:40px;animation:stgo-spin 1s linear infinite;margin:20px auto;display:none}\
-        @keyframes stgo-spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}';
+        .stgo-live{display:none;margin:10px auto}\
+        .stgo-phase{font-size:18px;font-weight:700;margin-bottom:5px}\
+        .stgo-speed-num{font-size:48px;font-weight:800;color:#1e293b}\
+        .stgo-speed-unit{font-size:18px;color:#64748b}';
 
         var style = E('style', {}, css);
+
+        // SVG gauge (semicircle speedometer)
+        var gaugeSvg = '' +
+        '<svg id="stgo-gauge" data-max="100" width="220" height="130" viewBox="0 0 200 130">' +
+            '<path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#e2e8f0" stroke-width="14" stroke-linecap="round"/>' +
+            '<path id="stgo-arc-active" d="M 20 100 A 80 80 0 0 1 20 100" fill="none" stroke="#00a6ff" stroke-width="14" stroke-linecap="round"/>' +
+            '<line id="stgo-needle" x1="100" y1="100" x2="35" y2="100" stroke="#1e293b" stroke-width="3" stroke-linecap="round"/>' +
+            '<circle cx="100" cy="100" r="8" fill="#1e293b"/>' +
+            '<text x="20" y="125" font-size="11" fill="#64748b">0</text>' +
+            '<text id="stgo-gauge-max" x="170" y="125" font-size="11" fill="#64748b">100</text>' +
+        '</svg>';
+
+        var liveDiv = E('div', { 'class': 'stgo-live', id: 'stgo-live' }, [
+            E('div', { 'class': 'stgo-phase', id: 'stgo-phase' }, _('Mengukur...')),
+            E('div', {}, gaugeSvg),
+            E('div', {}, [
+                E('span', { 'class': 'stgo-speed-num', id: 'stgo-live-speed' }, '0.0'),
+                E('span', { 'class': 'stgo-speed-unit' }, ' Mbps')
+            ])
+        ]);
+
         var card = E('div', { 'class': 'stgo-card' }, [
             E('h2', {}, _('Speedtest')),
             E('p', { style: 'color:#64748b' }, _('Test kecepatan internet via speedtest.net')),
             E('button', { 'class': 'stgo-btn', id: 'stgo-btn', click: ui.createHandlerFn(this, 'handleStart') }, _('GO')),
-            E('div', { 'class': 'stgo-spin', id: 'stgo-spin' }),
             E('div', { 'class': 'stgo-status', id: 'stgo-status' }),
+            liveDiv,
             E('div', { 'class': 'stgo-results', id: 'stgo-results' }, [
                 E('div', { style: 'text-align:center' }, [
                     E('div', { style: 'color:#64748b' }, _('Download')),
@@ -170,7 +269,6 @@ return view.extend({
             ])
         ]);
 
-        // Auto-load last completed result on page open
         setTimeout(function() {
             callStatus().then(function(r) {
                 if (r && r.status === 'DONE' && r.result) {
