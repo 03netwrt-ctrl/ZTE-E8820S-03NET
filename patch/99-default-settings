@@ -2,8 +2,8 @@
 # Beware! This script will be in /rom/etc/uci-defaults/ as part of the image.
 # It runs once at first boot.
 
-# --- Root password: "ikan" (SHA-512 hash, generated at build config time) ---
-sed -i 's|^root:[^:]*:|root:$6$TPPSmQ5JdhVHOdr4$MRDAJic1llCjcrzo9H3bwwn.ohlQsks7Kw6I.sqvCS7FXQegVfMRWn7wSHr2a0DlkgaAzYcqbRcG66AOu.ZjQ1:|' /etc/shadow
+# --- Root password: "03NETWRT" (SHA-512 hash) ---
+sed -i 's|^root:[^:]*:|root:$6$aoryLp8EifnQF6E.$GNVQ/ECgxuB8xZcuid6ik8cv.FsZhXdu2lXVMIhf3bYuj2Kfmxzdc4YYP3Fu1qXZIl8uBarqQ6ng8syqUBFtW1:|' /etc/shadow
 
 # --- Hostname branding ---
 uci set system.@system[0].hostname='03NET-E8820S'
@@ -72,7 +72,7 @@ fi
 
 # --- WiFi: 2.4GHz = 03NET-WRT, 5GHz = 03NET-WRT 5G ---
 # NOTE: WPA2 needs at least 8 characters!
-wlan_password="03netwrt"
+wlan_password="03NETWRT"
 
 if [ -n "$wlan_password" -a ${#wlan_password} -ge 8 ]; then
   for dev in $(uci show wireless 2>/dev/null | sed -n 's/^wireless\.\([^.=]*\)=wifi-device/\1/p'); do
