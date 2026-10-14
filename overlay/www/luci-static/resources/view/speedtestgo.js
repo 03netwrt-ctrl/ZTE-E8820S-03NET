@@ -112,13 +112,11 @@ return view.extend({
         isTesting = true;
         var btn = document.getElementById('stgo-btn');
         var statusEl = document.getElementById('stgo-status');
-        var spin = document.getElementById('stgo-spin');
         var res = document.getElementById('stgo-results');
         var liveWrap = document.getElementById('stgo-live');
 
         btn.disabled = true;
         btn.style.display = 'none';
-        spin.style.display = 'none'; // use gauge instead
         res.style.display = 'none';
         liveWrap.style.display = 'block';
         statusEl.textContent = _('Memulai tes...');
