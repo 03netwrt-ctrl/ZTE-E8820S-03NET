@@ -1,0 +1,11 @@
+# 03NET-WRT custom profile
+# Shows detailed MOTD instead of simple banner
+
+# Standard PATH
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+
+# Run 03NET detailed MOTD (skip simple /etc/banner)
+[ -x /etc/03net-motd.sh ] && /etc/03net-motd.sh
+
+# Standard OpenWrt profile bits
+[ -f /etc/shinit ] && . /etc/shinit
