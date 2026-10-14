@@ -216,7 +216,7 @@ return view.extend({
         var gaugeSvg = '' +
         '<svg id="stgo-gauge" data-max="100" width="220" height="130" viewBox="0 0 200 130">' +
             '<path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#e2e8f0" stroke-width="14" stroke-linecap="round"/>' +
-            '<path id="stgo-arc-active" d="M 20 100 A 80 80 0 0 1 20 100" fill="none" stroke="#00a6ff" stroke-width="14" stroke-linecap="round" style="transition:d .45s ease"/>'+
+            '<path id="stgo-arc-active" d="M 20 100 A 80 80 0 0 1 20 100" fill="none" stroke="#00a6ff" stroke-width="14" stroke-linecap="round"/>'+
             '<line id="stgo-needle" x1="100" y1="100" x2="100" y2="35" stroke="#1e293b" stroke-width="3" stroke-linecap="round" style="transition:transform .45s ease"/>'+
             '<circle cx="100" cy="100" r="8" fill="#1e293b"/>' +
             '<text x="20" y="125" font-size="11" fill="#64748b">0</text>' +
