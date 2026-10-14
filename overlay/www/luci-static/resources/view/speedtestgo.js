@@ -105,8 +105,11 @@ function updateGauge(mbps, phase) {
     }
 }
 
+var isTesting = false;
+
 return view.extend({
     handleStart: function(ev) {
+        isTesting = true;
         var btn = document.getElementById('stgo-btn');
         var statusEl = document.getElementById('stgo-status');
         var spin = document.getElementById('stgo-spin');
@@ -132,6 +135,7 @@ return view.extend({
             btn.disabled = false;
             btn.style.display = 'flex';
             liveWrap.style.display = 'none';
+            isTesting = false;
         };
 
         var check = function() {
@@ -270,7 +274,9 @@ return view.extend({
         ]);
 
         setTimeout(function() {
+            if (isTesting) return;
             callStatus().then(function(r) {
+                if (isTesting) return;
                 if (r && r.status === 'DONE' && r.result) {
                     if (parseAndShow(r.result)) {
                         document.getElementById('stgo-status').textContent = _('Hasil tes terakhir');
