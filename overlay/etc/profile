@@ -1,6 +1,7 @@
 # 03NET-WRT custom profile
 
 export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+export PS1='\u@\h:\w\$ '
 
 # Clear screen (hide BusyBox version line) then show detailed MOTD
 clear 2>/dev/null || printf '\33c\33[3J'
