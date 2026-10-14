@@ -6,14 +6,46 @@
 var callRun = rpc.declare({
     object: 'speedtestgo',
     method: 'run',
-    expect: { status: '' }
+    expect: { '': {} }
 });
 
 var callStatus = rpc.declare({
     object: 'speedtestgo',
     method: 'status',
-    expect: { status: '', result: '' }
+    expect: { '': {} }
 });
+
+function parseAndShow(r) {
+    var dl = '-', ul = '-', ping = '-', jitter = '-', server = '-', isp = '-';
+    try {
+        var jr = (typeof r === 'string') ? JSON.parse(r) : r;
+        var sv = (jr.servers && jr.servers.length) ? jr.servers[0] : null;
+        if (sv) {
+            if (sv.dl_speed) dl = (sv.dl_speed * 8 / 1e6).toFixed(1);
+            if (sv.ul_speed) ul = (sv.ul_speed * 8 / 1e6).toFixed(1);
+            if (sv.latency) ping = (sv.latency / 1e6).toFixed(1);
+            if (sv.jitter) jitter = (sv.jitter / 1e6).toFixed(1);
+            server = (sv.sponsor || '') + ' - ' + (sv.name || '');
+        } else {
+            if (jr.download && jr.download.bandwidth) dl = (jr.download.bandwidth * 8 / 1e6).toFixed(1);
+            if (jr.upload && jr.upload.bandwidth) ul = (jr.upload.bandwidth * 8 / 1e6).toFixed(1);
+            if (jr.ping && jr.ping.latency != null) ping = parseFloat(jr.ping.latency).toFixed(1);
+            if (jr.ping && jr.ping.jitter != null) jitter = parseFloat(jr.ping.jitter).toFixed(1);
+            if (jr.server) server = (jr.server.sponsor || '') + ' - ' + (jr.server.name || '');
+        }
+        if (jr.user_info && jr.user_info.Isp) isp = jr.user_info.Isp;
+        else if (jr.client && jr.client.isp) isp = jr.client.isp;
+    } catch (e) { return false; }
+
+    document.getElementById('stgo-dl').textContent = dl;
+    document.getElementById('stgo-ul').textContent = ul;
+    document.getElementById('stgo-ping').textContent = ping;
+    document.getElementById('stgo-jitter').textContent = jitter;
+    document.getElementById('stgo-server').textContent = server;
+    document.getElementById('stgo-isp').textContent = isp;
+    document.getElementById('stgo-results').style.display = 'block';
+    return true;
+}
 
 return view.extend({
     handleStart: function(ev) {
@@ -30,59 +62,7 @@ return view.extend({
 
         var startTime = Date.now();
         var timer = null;
-
-        var check = function() {
-            var elapsed = Math.floor((Date.now() - startTime) / 1000);
-            statusEl.textContent = _('Menguji...') + ' (' + elapsed + 's)';
-            callStatus().then(function(r) {
-                if (r.status === 'DONE') {
-                    clearInterval(timer);
-                    showResults(r.result);
-                } else if (r.status === 'ERROR') {
-                    clearInterval(timer);
-                    statusEl.textContent = _('Tes gagal. Cek koneksi internet.');
-                    resetUI();
-                }
-            });
-        };
-
-        var showResults = function(jsonStr) {
-            try {
-                var r = JSON.parse(jsonStr);
-                var dl = '-', ul = '-', ping = '-', jitter = '-', server = '-', isp = '-';
-                // Format 1: servers[] array (actual speedtest-go output)
-                var sv = (r.servers && r.servers.length) ? r.servers[0] : null;
-                if (sv) {
-                    if (sv.dl_speed) dl = (sv.dl_speed * 8 / 1e6).toFixed(1);
-                    if (sv.ul_speed) ul = (sv.ul_speed * 8 / 1e6).toFixed(1);
-                    if (sv.latency) ping = (sv.latency / 1e6).toFixed(1);
-                    if (sv.jitter) jitter = (sv.jitter / 1e6).toFixed(1);
-                    server = (sv.sponsor || '') + ' - ' + (sv.name || '');
-                }
-                // Format 2: flat download/upload/ping (fallback)
-                else {
-                    if (r.download && r.download.bandwidth) dl = (r.download.bandwidth * 8 / 1e6).toFixed(1);
-                    if (r.upload && r.upload.bandwidth) ul = (r.upload.bandwidth * 8 / 1e6).toFixed(1);
-                    if (r.ping && r.ping.latency != null) ping = parseFloat(r.ping.latency).toFixed(1);
-                    if (r.ping && r.ping.jitter != null) jitter = parseFloat(r.ping.jitter).toFixed(1);
-                    if (r.server) server = (r.server.sponsor || '') + ' - ' + (r.server.name || '');
-                }
-                if (r.user_info && r.user_info.Isp) isp = r.user_info.Isp;
-                else if (r.client && r.client.isp) isp = r.client.isp;
-
-                document.getElementById('stgo-dl').textContent = dl;
-                document.getElementById('stgo-ul').textContent = ul;
-                document.getElementById('stgo-ping').textContent = ping;
-                document.getElementById('stgo-jitter').textContent = jitter;
-                document.getElementById('stgo-server').textContent = server;
-                document.getElementById('stgo-isp').textContent = isp;
-                res.style.display = 'block';
-                statusEl.textContent = _('Selesai!');
-            } catch (e) {
-                statusEl.textContent = _('Gagal parse hasil');
-            }
-            resetUI();
-        };
+        var maxWait = 180; // 3 menit timeout
 
         var resetUI = function() {
             btn.disabled = false;
@@ -90,13 +70,47 @@ return view.extend({
             spin.style.display = 'none';
         };
 
+        var check = function() {
+            var elapsed = Math.floor((Date.now() - startTime) / 1000);
+            if (elapsed > maxWait) {
+                clearInterval(timer);
+                statusEl.textContent = _('Timeout. Coba lagi.');
+                resetUI();
+                return;
+            }
+            statusEl.textContent = _('Menguji...') + ' (' + elapsed + 's)';
+            callStatus().then(function(r) {
+                var st = r ? r.status : null;
+                if (st === 'DONE') {
+                    clearInterval(timer);
+                    if (r.result && parseAndShow(r.result)) {
+                        statusEl.textContent = _('Selesai!');
+                    } else {
+                        statusEl.textContent = _('Gagal parse hasil');
+                    }
+                    resetUI();
+                } else if (st === 'ERROR') {
+                    clearInterval(timer);
+                    statusEl.textContent = _('Tes gagal. Cek koneksi internet.');
+                    resetUI();
+                }
+                // else still RUNNING, keep polling
+            }).catch(function(e) {
+                clearInterval(timer);
+                statusEl.textContent = _('Error RPC: ') + e;
+                resetUI();
+            });
+        };
+
         callRun().then(function(r) {
-            if (r.status === 'error') {
-                statusEl.textContent = r.message || _('speedtest-go tidak terinstall');
+            var st = r ? r.status : null;
+            if (st === 'error' || st === 'ERROR') {
+                statusEl.textContent = (r && r.message) || _('speedtest-go tidak terinstall');
                 resetUI();
                 return;
             }
             timer = setInterval(check, 2000);
+            check();
         }).catch(function(e) {
             statusEl.textContent = _('Error: ') + e;
             resetUI();
@@ -156,26 +170,13 @@ return view.extend({
             ])
         ]);
 
-        // Auto-check for existing completed test on page load
+        // Auto-load last completed result on page open
         setTimeout(function() {
             callStatus().then(function(r) {
-                if (r.status === 'DONE' && r.result) {
-                    var statusEl = document.getElementById('stgo-status');
-                    var res = document.getElementById('stgo-results');
-                    try {
-                        var jr = JSON.parse(r.result);
-                        var sv = (jr.servers && jr.servers.length) ? jr.servers[0] : null;
-                        if (sv) {
-                            document.getElementById('stgo-dl').textContent = sv.dl_speed ? (sv.dl_speed * 8 / 1e6).toFixed(1) : '-';
-                            document.getElementById('stgo-ul').textContent = sv.ul_speed ? (sv.ul_speed * 8 / 1e6).toFixed(1) : '-';
-                            document.getElementById('stgo-ping').textContent = sv.latency ? (sv.latency / 1e6).toFixed(1) : '-';
-                            document.getElementById('stgo-jitter').textContent = sv.jitter ? (sv.jitter / 1e6).toFixed(1) : '-';
-                            document.getElementById('stgo-server').textContent = (sv.sponsor || '') + ' - ' + (sv.name || '');
-                            if (jr.user_info && jr.user_info.Isp) document.getElementById('stgo-isp').textContent = jr.user_info.Isp;
-                            res.style.display = 'block';
-                            statusEl.textContent = _('Hasil tes terakhir');
-                        }
-                    } catch (e) {}
+                if (r && r.status === 'DONE' && r.result) {
+                    if (parseAndShow(r.result)) {
+                        document.getElementById('stgo-status').textContent = _('Hasil tes terakhir');
+                    }
                 }
             }).catch(function() {});
         }, 500);
