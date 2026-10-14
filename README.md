@@ -9,11 +9,11 @@ USB modem drivers.
 ```
 LuCI            : http://192.168.1.1
 user            : root
-password        : ikan
+password        : 03NETWRT
 
 Wi-Fi 2.4GHz    : 03NET-WRT
 Wi-Fi 5GHz      : 03NET-WRT 5G
-Wi-Fi password  : (see release notes)
+Wi-Fi password  : 03NETWRT
 ```
 
 ## What's inside
