@@ -78,11 +78,10 @@ function updateGauge(mbps, phase) {
         var y1 = 100 - r * Math.sin(startAngle * Math.PI / 180);
         var x2 = 100 + r * Math.cos(endAngle * Math.PI / 180);
         var y2 = 100 - r * Math.sin(endAngle * Math.PI / 180);
-        var large = (frac > 0.5) ? 1 : 0;
         if (frac <= 0.001) {
             arc.setAttribute('d', 'M 20 100 A 80 80 0 0 1 20 100'); // empty
         } else {
-            arc.setAttribute('d', 'M 20 100 A 80 80 0 ' + large + ' 1 ' + x2.toFixed(1) + ' ' + y2.toFixed(1));
+            arc.setAttribute('d', 'M 20 100 A 80 80 0 0 1 ' + x2.toFixed(1) + ' ' + y2.toFixed(1));
         }
     }
     // Needle: rotate via CSS transform (smooth)
