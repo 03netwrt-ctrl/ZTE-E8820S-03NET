@@ -1,7 +1,7 @@
 # 03NET-WRT custom profile
 # Clear screen (hide BusyBox version line) then show detailed MOTD
 
-printf '\033[2J\033[H'
+clear 2>/dev/null || printf '\33c\33[3J'
 [ -x /etc/03net-motd.sh ] && /etc/03net-motd.sh
 
 export PATH=/usr/sbin:/usr/bin:/sbin:/bin
