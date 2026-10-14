@@ -14,6 +14,7 @@ cat <<'ART'
 ART
 echo "$HR"
 echo "                       WELCOME TO 03NET-WRT PROJECT"
+echo "                         Telegram: @O3netwrt77"
 echo "$HR"
 
 model="$(cat /tmp/sysinfo/model 2>/dev/null)"
@@ -68,6 +69,4 @@ if command -v curl >/dev/null 2>&1; then
 	isp=$(curl -m 4 -s "http://ip-api.com/line/?fields=query,org" 2>/dev/null | tr '\n' ' ' | sed 's/ *$//')
 	[ -n "$isp" ] && echo " * ISP    : $isp"
 fi
-echo "$HR"
-echo "  Telegram: @O3netwrt77"
 echo "$HR"
