@@ -85,14 +85,12 @@ function updateGauge(mbps, phase) {
             arc.setAttribute('d', 'M 20 100 A 80 80 0 ' + large + ' 1 ' + x2.toFixed(1) + ' ' + y2.toFixed(1));
         }
     }
-    // Needle
+    // Needle: rotate via CSS transform (smooth)
     var needle = document.getElementById('stgo-needle');
     if (needle) {
-        var ang = 180 - (frac * 180);
-        var nx = 100 + 65 * Math.cos(ang * Math.PI / 180);
-        var ny = 100 - 65 * Math.sin(ang * Math.PI / 180);
-        needle.setAttribute('x2', nx.toFixed(1));
-        needle.setAttribute('y2', ny.toFixed(1));
+        var rot = -90 + (frac * 180);
+        needle.style.transform = 'rotate(' + rot.toFixed(1) + 'deg)';
+        needle.style.transformOrigin = '100px 100px';
     }
     // Number
     document.getElementById('stgo-live-speed').textContent = mbps.toFixed(1);
@@ -187,7 +185,7 @@ return view.extend({
                 resetUI();
                 return;
             }
-            timer = setInterval(check, 1000);
+            timer = setInterval(check, 500);
             check();
         }).catch(function(e) {
             statusEl.textContent = _('Error: ') + e;
@@ -218,8 +216,8 @@ return view.extend({
         var gaugeSvg = '' +
         '<svg id="stgo-gauge" data-max="100" width="220" height="130" viewBox="0 0 200 130">' +
             '<path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#e2e8f0" stroke-width="14" stroke-linecap="round"/>' +
-            '<path id="stgo-arc-active" d="M 20 100 A 80 80 0 0 1 20 100" fill="none" stroke="#00a6ff" stroke-width="14" stroke-linecap="round"/>' +
-            '<line id="stgo-needle" x1="100" y1="100" x2="35" y2="100" stroke="#1e293b" stroke-width="3" stroke-linecap="round"/>' +
+            '<path id="stgo-arc-active" d="M 20 100 A 80 80 0 0 1 20 100" fill="none" stroke="#00a6ff" stroke-width="14" stroke-linecap="round" style="transition:d .45s ease"/>'+
+            '<line id="stgo-needle" x1="100" y1="100" x2="100" y2="35" stroke="#1e293b" stroke-width="3" stroke-linecap="round" style="transition:transform .45s ease"/>'+
             '<circle cx="100" cy="100" r="8" fill="#1e293b"/>' +
             '<text x="20" y="125" font-size="11" fill="#64748b">0</text>' +
             '<text id="stgo-gauge-max" x="170" y="125" font-size="11" fill="#64748b">100</text>' +
