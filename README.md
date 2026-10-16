@@ -71,4 +71,10 @@ To change the OpenWrt version, run the workflow manually with another tag
 - TinyFM: bobbyunknown/luci-app-tinyfm
 - OpenWrt project
 
+## Donasi
+
+Dukung pengembangan 03NET-WRT via QRIS:
+
+![QRIS 03NET-WRT](docs/qris-03net-wrt.png)
+
 Powered by **03NET** - Telegram @O3netwrt77
